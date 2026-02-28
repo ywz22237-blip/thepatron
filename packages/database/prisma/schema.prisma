@@ -1,0 +1,348 @@
+// THE PATRON — Prisma Schema
+// 3개 앱 공유 (investor / company / admin)
+// Supabase PostgreSQL
+
+generator client {
+  provider        = "prisma-client-js"
+  output          = "../generated/client"
+  previewFeatures = ["multiSchema"]
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ────────────────────────────────────────────────────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN
+  MANAGER
+}
+
+enum InvestorStatus {
+  PENDING    // 멤버십 신청 접수
+  APPROVED   // 심사 승인 (초대코드 발송 전)
+  REJECTED   // 심사 거절
+  ACTIVE     // 구독 중 (플랫폼 접근 가능)
+  SUSPENDED  // 정지
+}
+
+enum InvestmentType {
+  SOLO_PATRON    // 개인 투자
+  PATRON_CIRCLE  // 조합 공동 투자
+}
+
+enum DealStatus {
+  DRAFT      // 초안 (기업이 제출, 관리자 미검토)
+  REVIEWING  // 관리자 심사 중
+  ACTIVE     // 활성 (투자자 플랫폼 노출)
+  CLOSED     // 마감
+  REJECTED   // 거절
+}
+
+enum MatchStatus {
+  REQUESTED  // 신청 접수
+  REVIEWING  // 검토 중
+  DELIVERED  // 기업 전달
+  MEETING    // 미팅 조율
+  DEAL_ROOM  // NDA 완료
+  CONTRACT   // 계약 진행
+  COMPLETED  // 투자 완료
+}
+
+enum ApplicationStatus {
+  PENDING   // 검토 대기
+  APPROVED  // 승인 → 초대코드 발송
+  REJECTED  // 거절
+}
+
+enum SubscriptionStatus {
+  ACTIVE
+  PAST_DUE
+  CANCELLED
+}
+
+enum CircleStatus {
+  FORMING  // 결성 중
+  ACTIVE   // 운영 중
+  CLOSED   // 해산
+}
+
+enum NotificationType {
+  NEW_APPLICATION    // 새 멤버십 신청
+  NEW_DEAL           // 새 딜 등록
+  NEW_MATCH_REQUEST  // 새 매칭 신청
+  MATCH_UPDATE       // 매칭 상태 변경
+  SUBSCRIPTION_EVENT // 구독 이벤트
+}
+
+// ─── Profiles ────────────────────────────────────────────────────────────────
+// Supabase Auth UID와 1:1 매핑
+
+model InvestorProfile {
+  id          String         @id @default(cuid())
+  userId      String         @unique // Supabase Auth UID
+  name        String
+  email       String         @unique
+  phone       String?
+  profession  String         // 직군 (의사, 변호사, 회계사, 대기업 임원 등)
+  annualIncome Int?          // 연간 소득 (만원)
+  status      InvestorStatus @default(PENDING)
+
+  // 초대코드 (48시간 유효)
+  inviteCode          String?   @unique
+  inviteCodeExpiresAt DateTime?
+
+  subscriptions Subscription[]
+  matchRequests MatchRequest[]
+  circleMembers PatronCircleMember[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([email])
+}
+
+model CompanyProfile {
+  id        String  @id @default(cuid())
+  userId    String  @unique // Supabase Auth UID
+  name      String  // 기업명 — 관리자 및 NDA 체결 투자자에게만 노출
+  bizNumber String? @unique // 사업자 등록번호
+  ceoName   String?
+  email     String  @unique
+  phone     String?
+  website   String?
+
+  deals Deal[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+}
+
+model AdminProfile {
+  id     String    @id @default(cuid())
+  userId String    @unique // Supabase Auth UID
+  name   String
+  email  String    @unique
+  role   AdminRole @default(MANAGER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// ─── MembershipApplication ───────────────────────────────────────────────────
+// 초대코드 없이 접근 → 심사 → 승인 시 InvestorProfile 생성
+
+model MembershipApplication {
+  id         String            @id @default(cuid())
+  name       String
+  email      String
+  phone      String
+  profession String
+  annualIncome Int?            // 연간 소득 (만원)
+
+  // 절세 시뮬레이터 결과 (저장)
+  simulatedInvestment Int?
+  simulatedTaxSaving  Int?
+
+  status     ApplicationStatus @default(PENDING)
+  reviewNote String?           // 관리자 검토 메모
+  notionPageId String?         // 노션 동기화 페이지 ID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+  @@index([email])
+}
+
+// ─── Deal ─────────────────────────────────────────────────────────────────────
+
+model Deal {
+  id        String     @id @default(cuid())
+  companyId String
+  company   CompanyProfile @relation(fields: [companyId], references: [id])
+
+  // 투자자에게 표시되는 익명 정보 (기업명 절대 포함 금지)
+  briefTitle   String  // 예: "국내 1위 B2B SaaS 솔루션 Pre-A"
+  category     String  // 섹터: IT, 바이오, 핀테크, 커머스 등
+  stage        String  // 투자 단계: Pre-A, A, B 등
+
+  // 투자 조건
+  targetAmount  Int    // 목표 투자금 (만원)
+  minInvestment Int    // 최소 투자금 (만원)
+  maxInvestment Int?   // 최대 투자금 (만원)
+  valuation     Int?   // 기업 가치 (만원)
+  equity        Float? // 지분율 (%)
+
+  // 상세 — 관리자 + NDA 체결 투자자(MatchRequest.ndaSigned=true)만 열람
+  description String
+
+  // 중계료 납부 여부
+  feePaid   Boolean  @default(false)
+  feeAmount Int      @default(1000000) // 100만원
+
+  status DealStatus @default(DRAFT)
+
+  viewCount     Int @default(0)
+  interestCount Int @default(0)
+
+  matchRequests MatchRequest[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  closedAt  DateTime?
+
+  @@index([status])
+  @@index([companyId])
+  @@index([category])
+  @@index([stage])
+}
+
+// ─── MatchRequest ─────────────────────────────────────────────────────────────
+// 7단계 상태 머신: REQUESTED → REVIEWING → DELIVERED → MEETING → DEAL_ROOM → CONTRACT → COMPLETED
+
+model MatchRequest {
+  id         String  @id @default(cuid())
+  investorId String
+  investor   InvestorProfile @relation(fields: [investorId], references: [id])
+  dealId     String
+  deal       Deal    @relation(fields: [dealId], references: [id])
+
+  investmentAmount Int            // 투자 희망 금액 (만원)
+  investmentType   InvestmentType @default(SOLO_PATRON)
+  circleId         String?
+  circle           PatronCircle?  @relation(fields: [circleId], references: [id])
+
+  status      MatchStatus @default(REQUESTED)
+  ndaSigned   Boolean     @default(false)
+  ndaSignedAt DateTime?
+
+  investorNote String? // 투자자 메모 (관리자만 열람)
+  adminNote    String? // 관리자 내부 메모 (투자자 비공개)
+
+  // 상태 변경 이력
+  statusHistory MatchStatusHistory[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([investorId, dealId]) // 같은 딜에 중복 신청 방지
+  @@index([status])
+  @@index([investorId])
+  @@index([dealId])
+}
+
+model MatchStatusHistory {
+  id             String      @id @default(cuid())
+  matchRequestId String
+  matchRequest   MatchRequest @relation(fields: [matchRequestId], references: [id])
+  fromStatus     MatchStatus?
+  toStatus       MatchStatus
+  changedById    String      // AdminProfile.id
+  note           String?
+
+  createdAt DateTime @default(now())
+
+  @@index([matchRequestId])
+}
+
+// ─── Subscription ─────────────────────────────────────────────────────────────
+// 투자자 월 59,000원 자동결제 (토스페이먼츠)
+
+model Subscription {
+  id         String  @id @default(cuid())
+  investorId String
+  investor   InvestorProfile @relation(fields: [investorId], references: [id])
+
+  status        SubscriptionStatus @default(ACTIVE)
+  amount        Int                @default(59000)
+  tossPaymentKey String?
+  tossOrderId   String?            @unique
+  tossBillingKey String?           // 자동결제 빌링키
+
+  startedAt     DateTime @default(now())
+  nextBillingAt DateTime
+  cancelledAt   DateTime?
+
+  payments SubscriptionPayment[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([investorId])
+  @@index([status])
+}
+
+model SubscriptionPayment {
+  id             String @id @default(cuid())
+  subscriptionId String
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id])
+
+  amount       Int
+  status       String   // SUCCESS | FAIL
+  tossPaymentKey String?
+  tossOrderId  String?  @unique
+  paidAt       DateTime?
+  failReason   String?
+
+  createdAt DateTime @default(now())
+}
+
+// ─── PatronCircle ─────────────────────────────────────────────────────────────
+// 더페트론이 GP 역할을 맡는 엔젤투자조합
+
+model PatronCircle {
+  id         String      @id @default(cuid())
+  name       String
+  managerId  String      // AdminProfile.id (GP)
+  targetAmount  Int      // 목표 결성액 (만원)
+  currentAmount Int      @default(0) // 현재 결성액 (만원)
+  managementFeeRate Float @default(0.02) // 운영 보수율 (기본 2%)
+
+  status CircleStatus @default(FORMING)
+
+  members       PatronCircleMember[]
+  matchRequests MatchRequest[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([status])
+}
+
+model PatronCircleMember {
+  id       String @id @default(cuid())
+  circleId String
+  circle   PatronCircle    @relation(fields: [circleId], references: [id])
+  investorId String
+  investor   InvestorProfile @relation(fields: [investorId], references: [id])
+
+  amount   Int      // 개인 출자금 (만원)
+  joinedAt DateTime @default(now())
+
+  @@unique([circleId, investorId])
+  @@index([investorId])
+}
+
+// ─── AdminNotification ───────────────────────────────────────────────────────
+// Supabase Realtime → 관리자 브라우저 실시간 토스트
+
+model AdminNotification {
+  id    String           @id @default(cuid())
+  type  NotificationType
+  title String
+  body  String
+  data  Json?
+  isRead Boolean         @default(false)
+
+  createdAt DateTime @default(now())
+
+  @@index([isRead])
+  @@index([createdAt])
+}
