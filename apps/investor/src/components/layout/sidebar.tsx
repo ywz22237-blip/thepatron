@@ -9,6 +9,7 @@ import {
   Users,
   User,
   Calculator,
+  CreditCard,
   LogOut,
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -39,6 +40,11 @@ const NAV_ITEMS = [
     href: '/simulator',
     label: '절세 계산기',
     icon: Calculator,
+  },
+  {
+    href: '/billing',
+    label: '구독 & 결제',
+    icon: CreditCard,
   },
   {
     href: '/profile',

@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { CheckCircle2, XCircle, Loader2 } from 'lucide-react'
+import { CheckCircle2, XCircle, Loader2, Mail, Copy } from 'lucide-react'
 import { createBrowserClient } from '@supabase/ssr'
 import { toast } from 'sonner'
 
@@ -18,35 +18,55 @@ export function ApplicationActions({ application }: { application: Application }
   const router = useRouter()
   const [note, setNote] = useState(application.reviewNote ?? '')
   const [loading, setLoading] = useState<'approve' | 'reject' | null>(null)
+  const [inviteCode, setInviteCode] = useState<string | null>(null)
 
   const supabase = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   )
 
-  async function handleAction(action: 'approve' | 'reject') {
-    setLoading(action)
-    const newStatus = action === 'approve' ? 'APPROVED' : 'REJECTED'
+  async function handleApprove() {
+    setLoading('approve')
+    try {
+      const res = await fetch(`/api/applications/${application.id}/approve`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reviewNote: note || null }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
 
+      if (data.warning) {
+        toast.warning(data.warning)
+        setInviteCode(data.code)
+      } else {
+        toast.success(`${application.name}님 승인 — 초대 이메일이 발송되었습니다`)
+        setInviteCode(data.code)
+      }
+      router.refresh()
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : '오류 발생'
+      toast.error(message)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  async function handleReject() {
+    setLoading('reject')
     const { error } = await supabase
       .from('MembershipApplication')
-      .update({ status: newStatus, reviewNote: note || null })
+      .update({ status: 'REJECTED', reviewNote: note || null })
       .eq('id', application.id)
 
     if (error) {
       toast.error('처리 중 오류가 발생했습니다')
-      setLoading(null)
-      return
-    }
-
-    if (action === 'approve') {
-      toast.success(`${application.name}님 신청을 승인했습니다`)
     } else {
       toast.success(`${application.name}님 신청을 거절했습니다`)
+      router.push('/applications')
+      router.refresh()
     }
-
-    router.push('/applications')
-    router.refresh()
+    setLoading(null)
   }
 
   const isPending = application.status === 'PENDING'
@@ -73,6 +93,33 @@ export function ApplicationActions({ application }: { application: Application }
         </div>
       </div>
 
+      {/* 발급된 초대코드 표시 (승인 직후) */}
+      {inviteCode && (
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <div className="mb-2 flex items-center gap-2">
+            <Mail size={16} className="text-emerald-600" />
+            <p className="text-sm font-semibold text-emerald-700">초대 코드 발급 완료</p>
+          </div>
+          <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
+            <code className="flex-1 text-center text-lg font-bold tracking-widest text-emerald-700">
+              {inviteCode}
+            </code>
+            <button
+              onClick={() => {
+                navigator.clipboard.writeText(inviteCode)
+                toast.success('복사됨')
+              }}
+              className="rounded p-1 hover:bg-emerald-100"
+            >
+              <Copy size={14} className="text-emerald-600" />
+            </button>
+          </div>
+          <p className="mt-2 text-xs text-emerald-600">
+            {application.email}로 초대 이메일이 발송되었습니다. 7일 내 사용 가능.
+          </p>
+        </div>
+      )}
+
       {/* 메모 입력 */}
       <div className="rounded-xl border border-[#E2E8F0] bg-white p-5">
         <label className="mb-2 block text-sm font-semibold text-[#0F172A]">
@@ -91,7 +138,7 @@ export function ApplicationActions({ application }: { application: Application }
       {isPending && (
         <div className="space-y-2">
           <button
-            onClick={() => handleAction('approve')}
+            onClick={handleApprove}
             disabled={loading !== null}
             className="flex w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 py-3 font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
           >
@@ -100,12 +147,12 @@ export function ApplicationActions({ application }: { application: Application }
             ) : (
               <>
                 <CheckCircle2 size={18} />
-                승인 — 초대 코드 발송
+                승인 — 초대 코드 이메일 발송
               </>
             )}
           </button>
           <button
-            onClick={() => handleAction('reject')}
+            onClick={handleReject}
             disabled={loading !== null}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-red-200 bg-red-50 py-3 font-semibold text-red-600 hover:bg-red-100 disabled:opacity-50"
           >
@@ -121,10 +168,8 @@ export function ApplicationActions({ application }: { application: Application }
         </div>
       )}
 
-      {!isPending && (
-        <p className="text-center text-xs text-[#94A3B8]">
-          이미 처리된 신청입니다
-        </p>
+      {!isPending && !inviteCode && (
+        <p className="text-center text-xs text-[#94A3B8]">이미 처리된 신청입니다</p>
       )}
     </div>
   )

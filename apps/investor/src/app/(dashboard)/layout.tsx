@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Sidebar } from '@/components/layout/sidebar'
 import { MobileNav } from '@/components/layout/mobile-nav'
+import { ChannelTalk } from '@/components/support/channel-talk'
 
 // 대시보드 레이아웃 — ACTIVE 구독자만 접근
 export default async function DashboardLayout({
@@ -16,6 +17,13 @@ export default async function DashboardLayout({
 
   if (!user) redirect('/login')
 
+  // 투자자 프로필 (채널톡 사용자 식별용)
+  const { data: investor } = await supabase
+    .from('InvestorProfile')
+    .select('id, name, email')
+    .eq('userId', user.id)
+    .single()
+
   return (
     <div className="flex min-h-screen bg-[#0A0A0A]">
       {/* PC/태블릿 사이드바 */}
@@ -28,6 +36,16 @@ export default async function DashboardLayout({
 
       {/* 모바일 하단 탭바 */}
       <MobileNav />
+
+      {/* 채널톡 CS 위젯 */}
+      {process.env.NEXT_PUBLIC_CHANNEL_TALK_KEY && (
+        <ChannelTalk
+          pluginKey={process.env.NEXT_PUBLIC_CHANNEL_TALK_KEY}
+          userId={investor?.id}
+          userEmail={investor?.email ?? user.email}
+          userName={investor?.name}
+        />
+      )}
     </div>
   )
 }

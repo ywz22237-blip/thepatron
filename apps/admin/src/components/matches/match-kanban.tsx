@@ -80,15 +80,15 @@ export function MatchKanban({ matches }: { matches: MatchRequest[] }) {
     const newStatus = STATUS_ORDER[nextIdx]
     setLoading(true)
 
-    const updateData: Record<string, unknown> = { status: newStatus }
-    if (newStatus === 'DEAL_ROOM') updateData.ndaSigned = true
-
-    const { error } = await supabase
-      .from('MatchRequest')
-      .update(updateData)
-      .eq('id', matchId)
-
-    if (error) {
+    // API 라우트를 통해 상태 변경 + 이메일 알림
+    try {
+      const res = await fetch(`/api/matches/${matchId}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) throw new Error('상태 변경 실패')
+    } catch {
       toast.error('상태 변경 실패')
       setLoading(false)
       return
@@ -106,7 +106,7 @@ export function MatchKanban({ matches }: { matches: MatchRequest[] }) {
       setSelectedMatch((prev) => prev ? { ...prev, status: newStatus } : null)
     }
 
-    toast.success(`"${STATUS_LABELS[newStatus]}"으로 변경`)
+    toast.success(`"${STATUS_LABELS[newStatus]}"으로 변경 — 이메일 알림 발송`)
     setLoading(false)
   }
 
