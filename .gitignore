@@ -28,6 +28,9 @@ yarn-error.log*
 *.pem
 .vercel
 
+# Screenshots
+shot*.png
+
 # TypeScript
 *.tsbuildinfo
 
