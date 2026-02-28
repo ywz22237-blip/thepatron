@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
 const PUBLIC_PATHS = ['/login']
+const ADMIN_ROLES = ['SUPER_ADMIN', 'MANAGER']
 
 export async function middleware(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -31,7 +32,19 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // TODO: AdminProfile.role 체크 (SUPER_ADMIN | MANAGER만 허용)
+  if (user && !isPublicPath) {
+    // AdminProfile.role 체크 — SUPER_ADMIN 또는 MANAGER만 허용
+    const { data: adminProfile } = await supabase
+      .from('AdminProfile')
+      .select('role')
+      .eq('userId', user.id)
+      .single()
+
+    if (!adminProfile || !ADMIN_ROLES.includes(adminProfile.role)) {
+      await supabase.auth.signOut()
+      return NextResponse.redirect(new URL('/login?error=unauthorized', request.url))
+    }
+  }
 
   if (user && pathname === '/login') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
