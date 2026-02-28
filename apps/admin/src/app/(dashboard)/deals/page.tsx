@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
-import { Briefcase, ChevronRight, Eye } from 'lucide-react'
+import { Briefcase, ChevronRight, Eye, Plus } from 'lucide-react'
 
 export const metadata = { title: '딜 관리' }
 
@@ -47,9 +47,18 @@ export default async function AdminDealsPage({
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0F172A]">딜 관리</h1>
-        <p className="mt-1 text-sm text-[#64748B]">기업이 등재 신청한 딜을 심사하고 관리하세요</p>
+      <div className="flex items-start justify-between">
+        <div>
+          <h1 className="text-2xl font-bold text-[#0F172A]">딜 관리</h1>
+          <p className="mt-1 text-sm text-[#64748B]">기업이 등재 신청한 딜을 심사하고 관리하세요</p>
+        </div>
+        <Link
+          href="/deals/new"
+          className="flex items-center gap-2 rounded-lg bg-[#1B3A6B] px-4 py-2 text-sm font-semibold text-white transition-opacity hover:opacity-90"
+        >
+          <Plus size={16} />
+          딜 직접 등록
+        </Link>
       </div>
 
       {/* 탭 */}

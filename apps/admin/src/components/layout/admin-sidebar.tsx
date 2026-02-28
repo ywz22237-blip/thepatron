@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { usePathname, useRouter } from 'next/navigation'
 import {
   LayoutDashboard,
   Users,
@@ -12,13 +12,15 @@ import {
   LogOut,
   ChevronRight,
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { useEffect, useState } from 'react'
 
 const NAV_GROUPS = [
   {
     label: '운영',
     items: [
       { href: '/dashboard', label: '대시보드', icon: LayoutDashboard },
-      { href: '/notifications', label: '알림', icon: Bell },
+      { href: '/notifications', label: '알림', icon: Bell, badge: true },
     ],
   },
   {
@@ -43,6 +45,37 @@ const NAV_GROUPS = [
 
 export function AdminSidebar() {
   const pathname = usePathname()
+  const router = useRouter()
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase
+      .from('AdminNotification')
+      .select('id', { count: 'exact', head: true })
+      .eq('isRead', false)
+      .then(({ count }) => setUnreadCount(count ?? 0))
+
+    // Realtime 구독
+    const channel = supabase
+      .channel('admin-notifications')
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'AdminNotification',
+      }, () => {
+        setUnreadCount((c) => c + 1)
+      })
+      .subscribe()
+
+    return () => { supabase.removeChannel(channel) }
+  }, [])
+
+  async function handleLogout() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/login')
+  }
 
   return (
     <aside className="flex w-60 shrink-0 flex-col bg-[#1B3A6B] text-white">
@@ -80,7 +113,14 @@ export function AdminSidebar() {
                 >
                   <Icon size={16} className="shrink-0" />
                   <span className="truncate">{item.label}</span>
-                  {isActive && <ChevronRight size={14} className="ml-auto shrink-0 opacity-60" />}
+                  {'badge' in item && item.badge && unreadCount > 0 && (
+                    <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-red-500 px-1.5 text-[10px] font-bold text-white">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </span>
+                  )}
+                  {isActive && !('badge' in item && item.badge && unreadCount > 0) && (
+                    <ChevronRight size={14} className="ml-auto shrink-0 opacity-60" />
+                  )}
                 </Link>
               )
             })}
@@ -90,7 +130,10 @@ export function AdminSidebar() {
 
       {/* 하단 로그아웃 */}
       <div className="border-t border-white/10 p-3">
-        <button className="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-sm text-white/40 transition-all hover:bg-white/10 hover:text-white">
+        <button
+          onClick={handleLogout}
+          className="flex h-9 w-full items-center gap-2.5 rounded-lg px-3 text-sm text-white/40 transition-all hover:bg-white/10 hover:text-white"
+        >
           <LogOut size={16} />
           <span>로그아웃</span>
         </button>

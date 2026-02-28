@@ -57,9 +57,31 @@ export async function PATCH(
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // 이메일 알림 — REQUESTED 제외한 상태에서 발송
   const investor = Array.isArray(match.investor) ? match.investor[0] : match.investor
   const deal = Array.isArray(match.deal) ? match.deal[0] : match.deal
+
+  // 인앱 알림 — InvestorNotification 생성
+  if (newStatus !== 'REQUESTED' && investor) {
+    const statusKo = MATCH_STATUS_KO[newStatus] || newStatus
+    const { data: investorProfile } = await supabase
+      .from('InvestorProfile')
+      .select('id')
+      .eq('email', investor.email)
+      .single()
+
+    if (investorProfile) {
+      supabase.from('InvestorNotification').insert({
+        investorId: investorProfile.id,
+        type: 'MATCH_UPDATE',
+        title: `매칭 상태 업데이트 — ${statusKo}`,
+        body: `"${deal?.briefTitle ?? '딜'}" 매칭이 ${statusKo} 단계로 변경되었습니다.`,
+        data: { matchId: params.id },
+      }).then(() => {})
+    }
+  }
+
+  // 이메일 알림 — REQUESTED 제외한 상태에서 발송
+
 
   if (newStatus !== 'REQUESTED' && investor?.email) {
     const statusKo = MATCH_STATUS_KO[newStatus] || newStatus

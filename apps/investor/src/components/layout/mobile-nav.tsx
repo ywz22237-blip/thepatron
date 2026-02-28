@@ -2,13 +2,13 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { LayoutDashboard, Briefcase, GitMerge, Users, User } from 'lucide-react'
+import { LayoutDashboard, Briefcase, GitMerge, Bell, User } from 'lucide-react'
 
 const TAB_ITEMS = [
   { href: '/dashboard', label: '홈', icon: LayoutDashboard },
   { href: '/deals', label: '딜', icon: Briefcase },
   { href: '/matches', label: '매칭', icon: GitMerge },
-  { href: '/circles', label: '조합', icon: Users },
+  { href: '/notifications', label: '알림', icon: Bell },
   { href: '/profile', label: '내 정보', icon: User },
 ]
 
@@ -30,7 +30,6 @@ export function MobileNav() {
               isActive ? 'text-[#D4AF37]' : 'text-[#666666]'
             }`}
           >
-            {/* 터치 타겟 h-12 보장 */}
             <div className="flex h-12 flex-col items-center justify-center gap-1">
               <Icon size={20} />
               <span className="text-[10px]">{item.label}</span>
