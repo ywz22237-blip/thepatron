@@ -1,5 +1,25 @@
 {
   "buildCommand": "cd ../.. && pnpm build --filter=@thepatron/company",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@company-supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@company-supabase-anon-key",
+    "NEXT_PUBLIC_INVESTOR_URL": "@investor-url",
+    "NEXT_PUBLIC_COMPANY_URL": "@company-url",
+    "NEXT_PUBLIC_ADMIN_URL": "@admin-url"
+  },
+  "buildEnv": {
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key"
+  }
 }

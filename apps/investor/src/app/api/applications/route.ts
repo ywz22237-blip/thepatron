@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { NextResponse, type NextRequest } from 'next/server'
 import { z } from 'zod'
+import { syncApplicationToNotion } from '@/lib/notion'
 
 const schema = z.object({
   name: z.string().min(2),
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
         simulatedTaxSaving: data.simulatedTaxSaving ?? null,
         status: 'PENDING',
       })
-      .select('id')
+      .select('id, createdAt')
       .single()
 
     if (error) {
@@ -79,6 +80,30 @@ export async function POST(request: NextRequest) {
         { error: { code: 'DB_ERROR', message: '신청 처리 중 오류가 발생했습니다.' } },
         { status: 500 }
       )
+    }
+
+    // Notion DB 동기화 (비동기 — 실패해도 신청은 성공 처리)
+    if (process.env.NOTION_API_KEY && process.env.NOTION_APPLICATIONS_DB_ID) {
+      syncApplicationToNotion({
+        id: application.id,
+        name: data.name,
+        email: data.email,
+        phone: data.phone,
+        profession: data.profession,
+        annualIncome: data.annualIncome,
+        simulatedInvestment: data.simulatedInvestment,
+        simulatedTaxSaving: data.simulatedTaxSaving,
+        createdAt: (application as { id: string; createdAt: string }).createdAt ?? new Date().toISOString(),
+      })
+        .then((notionPageId) => {
+          if (notionPageId) {
+            supabase.from('MembershipApplication')
+              .update({ notionPageId })
+              .eq('id', application.id)
+              .then(() => {})
+          }
+        })
+        .catch((err) => console.error('Notion sync failed:', err))
     }
 
     return NextResponse.json({ data: { id: application.id } }, { status: 201 })

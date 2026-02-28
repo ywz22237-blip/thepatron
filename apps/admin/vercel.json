@@ -1,5 +1,28 @@
 {
   "buildCommand": "cd ../.. && pnpm build --filter=@thepatron/admin",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" }
+      ]
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@admin-supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@admin-supabase-anon-key",
+    "NEXT_PUBLIC_INVESTOR_URL": "@investor-url",
+    "NEXT_PUBLIC_COMPANY_URL": "@company-url",
+    "NEXT_PUBLIC_ADMIN_URL": "@admin-url"
+  },
+  "buildEnv": {
+    "RESEND_API_KEY": "@resend-api-key",
+    "NOTION_API_KEY": "@notion-api-key",
+    "NOTION_APPLICATIONS_DB_ID": "@notion-applications-db-id",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key"
+  }
 }

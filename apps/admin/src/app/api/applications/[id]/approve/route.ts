@@ -4,6 +4,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { sendInviteEmail } from '@/lib/resend'
+import { updateNotionApplicationStatus } from '@/lib/notion'
 
 function generateInviteCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -70,6 +71,12 @@ export async function POST(
     .update({ status: 'APPROVED', reviewNote })
     .eq('id', params.id)
   if (appErr) return NextResponse.json({ error: appErr.message }, { status: 500 })
+
+  // Notion 상태 업데이트 (비동기)
+  if (application.notionPageId && process.env.NOTION_API_KEY) {
+    updateNotionApplicationStatus(application.notionPageId, 'APPROVED', reviewNote)
+      .catch((err) => console.error('Notion status update failed:', err))
+  }
 
   // 이메일 발송
   const investorUrl = process.env.NEXT_PUBLIC_INVESTOR_URL || 'http://localhost:3000'

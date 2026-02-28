@@ -1,5 +1,35 @@
 {
   "buildCommand": "cd ../.. && pnpm build --filter=@thepatron/investor",
   "outputDirectory": ".next",
-  "framework": "nextjs"
+  "framework": "nextjs",
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "Permissions-Policy", "value": "camera=(), microphone=(), geolocation=()" }
+      ]
+    }
+  ],
+  "env": {
+    "NEXT_PUBLIC_SUPABASE_URL": "@investor-supabase-url",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY": "@investor-supabase-anon-key",
+    "NEXT_PUBLIC_INVESTOR_URL": "@investor-url",
+    "NEXT_PUBLIC_COMPANY_URL": "@company-url",
+    "NEXT_PUBLIC_ADMIN_URL": "@admin-url",
+    "NEXT_PUBLIC_TOSS_CLIENT_KEY": "@toss-client-key",
+    "NEXT_PUBLIC_CHANNEL_TALK_KEY": "@channel-talk-key"
+  },
+  "buildEnv": {
+    "TOSS_SECRET_KEY": "@toss-secret-key",
+    "RESEND_API_KEY": "@resend-api-key",
+    "MODUSIGN_API_KEY": "@modusign-api-key",
+    "MODUSIGN_EMAIL": "@modusign-email",
+    "MODUSIGN_NDA_TEMPLATE_ID": "@modusign-nda-template-id",
+    "NOTION_API_KEY": "@notion-api-key",
+    "NOTION_APPLICATIONS_DB_ID": "@notion-applications-db-id",
+    "SUPABASE_SERVICE_ROLE_KEY": "@supabase-service-role-key"
+  }
 }
