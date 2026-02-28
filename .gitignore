@@ -30,6 +30,7 @@ yarn-error.log*
 
 # Screenshots
 shot*.png
+prev*.png
 
 # TypeScript
 *.tsbuildinfo
