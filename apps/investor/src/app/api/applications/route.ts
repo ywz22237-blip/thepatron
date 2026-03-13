@@ -7,7 +7,6 @@ import { syncApplicationToNotion } from '@/lib/notion'
 const schema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  phone: z.string().min(10),
   profession: z.string().min(1),
   annualIncome: z.number().int().positive().optional(),
   simulatedInvestment: z.number().int().positive().optional(),
@@ -64,7 +63,6 @@ export async function POST(request: NextRequest) {
       .insert({
         name: data.name,
         email: data.email,
-        phone: data.phone,
         profession: data.profession,
         annualIncome: data.annualIncome ?? null,
         simulatedInvestment: data.simulatedInvestment ?? null,
@@ -88,7 +86,6 @@ export async function POST(request: NextRequest) {
         id: application.id,
         name: data.name,
         email: data.email,
-        phone: data.phone,
         profession: data.profession,
         annualIncome: data.annualIncome,
         simulatedInvestment: data.simulatedInvestment,

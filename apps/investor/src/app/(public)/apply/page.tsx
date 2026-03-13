@@ -55,10 +55,6 @@ const PROFESSIONS = [
 const formSchema = z.object({
   name: z.string().min(2, '이름은 2자 이상이어야 합니다'),
   email: z.string().email('올바른 이메일 주소를 입력하세요'),
-  phone: z
-    .string()
-    .min(10, '올바른 연락처를 입력하세요')
-    .regex(/^[0-9-]+$/, '숫자와 하이픈(-)만 입력 가능합니다'),
   profession: z.string().min(1, '직군을 선택해주세요'),
   annualIncome: z.number().int().positive().optional(),
 })
@@ -315,22 +311,6 @@ export default function ApplyPage() {
                 )}
               </div>
 
-              {/* 연락처 */}
-              <div>
-                <label className="mb-1.5 block text-sm text-[#A0A0A0]">
-                  연락처 <span className="text-[#D4AF37]">*</span>
-                </label>
-                <input
-                  {...register('phone')}
-                  type="tel"
-                  placeholder="010-0000-0000"
-                  className="w-full rounded-lg border border-[#2F2F2F] bg-[#1A1A1A] px-4 py-3 text-sm text-white placeholder-[#555555] outline-none transition-all focus:border-[#D4AF37] focus:ring-1 focus:ring-[#D4AF37]/30"
-                />
-                {errors.phone && (
-                  <p className="mt-1 text-xs text-red-400">{errors.phone.message}</p>
-                )}
-              </div>
-
               {/* 직군 */}
               <div>
                 <label className="mb-1.5 block text-sm text-[#A0A0A0]">
@@ -362,7 +342,7 @@ export default function ApplyPage() {
                 <p className="font-medium text-[#A0A0A0]">개인정보 수집 · 이용 동의</p>
                 <p className="mt-2 leading-relaxed">
                   더페트론(주식회사 벤처플랫폼)은 멤버십 심사 목적으로 개인정보를 수집합니다.
-                  수집 항목: 이름, 이메일, 연락처, 직군. 보유 기간: 심사 완료 후 1년.
+                  수집 항목: 이름, 이메일, 직군. 보유 기간: 심사 완료 후 1년.
                 </p>
                 <p className="mt-2 text-xs">신청 버튼 클릭 시 개인정보 수집 및 이용에 동의한 것으로 간주합니다.</p>
               </div>
