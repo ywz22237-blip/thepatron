@@ -1,0 +1,99 @@
+name: Auto Merge Claude Branch to Master
+
+on:
+  push:
+    branches:
+      - 'claude/**'
+
+jobs:
+  auto-merge:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Deploy via fresh PR
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const { execSync } = require('child_process');
+            const branch = context.ref.replace('refs/heads/', '');
+
+            execSync('git config user.email "actions@github.com"');
+            execSync('git config user.name "GitHub Actions"');
+            execSync('git fetch origin');
+
+            // 파일 변경사항 확인
+            const diff = execSync(`git diff --name-only origin/master..origin/${branch}`).toString().trim();
+            if (!diff) {
+              console.log('변경사항 없음, 스킵');
+              return;
+            }
+            console.log('변경된 파일:\n' + diff);
+
+            // master 기준으로 새 deploy 브랜치 생성 (충돌 없음)
+            const deployBranch = `deploy/${Date.now()}`;
+            execSync(`git checkout -b ${deployBranch} origin/master`);
+
+            // claude 브랜치의 파일을 그대로 덮어씌우기
+            execSync(`git checkout origin/${branch} -- .`);
+            execSync('git add -A');
+
+            // 스테이징된 변경사항이 있는지 확인
+            try {
+              execSync('git diff --cached --quiet');
+              console.log('스테이징 변경사항 없음');
+              return;
+            } catch(e) {
+              // 변경사항 있음 → 계속
+            }
+
+            execSync(`git commit -m "Auto deploy from ${branch}"`);
+            execSync(`git push origin ${deployBranch}`);
+
+            // PR 생성
+            const { data: pr } = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Auto deploy: ${branch}`,
+              head: deployBranch,
+              base: 'master',
+              body: `${branch} 브랜치의 변경사항을 배포합니다.`
+            });
+            console.log(`PR 생성: #${pr.number}`);
+
+            // mergeable 상태가 될 때까지 폴링 (최대 60초)
+            let mergeable = null;
+            for (let i = 0; i < 12; i++) {
+              await new Promise(r => setTimeout(r, 5000));
+              const { data: prState } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: pr.number,
+              });
+              mergeable = prState.mergeable;
+              console.log(`머지 가능 여부 확인 (${i+1}/12): ${mergeable}`);
+              if (mergeable === true) break;
+              if (mergeable === false) {
+                console.log('머지 불가 상태, 스킵');
+                return;
+              }
+              // null이면 아직 계산 중 → 재시도
+            }
+
+            // PR 머지
+            await github.rest.pulls.merge({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: pr.number,
+              merge_method: 'squash'
+            });
+            console.log(`PR #${pr.number} 머지 완료 → Vercel 자동 배포`);
